@@ -6,22 +6,22 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue.svg)](droid_mcp.py)
 
-**Your Android phone as MCP tools: 40 tools, 3 backends, 1 file.**
+**Your Android phone as MCP tools: 47 tools, 3 backends, 1 file.**
 
-**你的安卓手机，变成 MCP 工具：40 个工具，3 种接法，1 个文件。**
+**你的安卓手机，变成 MCP 工具：47 个工具，3 种接法，1 个文件。**
 
 如果觉得有用，点个 ⭐ 吧！
 
 ## 30 秒上手（三选一）
 
-**A. 手机 Termux 里跑（功能最全，40/40）**
+**A. 手机 Termux 里跑（功能最全，47/47）**
 
 ```bash
 pkg install termux-api python git && git clone https://github.com/ice-wocker/droid-mcp.git
 cd droid-mcp && claude mcp add droid-mcp -- python3 $(pwd)/droid_mcp.py
 ```
 
-**B. companion APK（不用装 Termux，19/40，数据类全覆盖）**
+**B. companion APK（不用装 Termux，20/47，数据类全覆盖）**
 
 去 [Releases](https://github.com/ice-wocker/droid-mcp/releases) 下 companion APK，
 手机上打开，允许要的权限，屏幕上有 token 和 IP，然后：
@@ -33,7 +33,7 @@ claude mcp add droid-mcp -- python3 droid_mcp.py \
 
 详细步骤与各厂商权限在哪开：[`docs/COMPANION.md`](docs/COMPANION.md)。
 
-**C. 先玩起来（无手机，40/40 全是假数据）**
+**C. 先玩起来（无手机，47/47 全是假数据）**
 
 ```bash
 python3 droid_mcp.py --mock
@@ -97,8 +97,15 @@ AI：● mic_record → /sdcard/Download/droid-mcp-rec.m4a
 | `share_file` ✏️ | 系统分享面板 | ✅ | ❌ | ✅ |
 | `open_url` ✏️ | 浏览器打开链接 | ✅ | ❌ | ✅ |
 | `confirm_dialog` ✏️ | 手机弹确认框等人点（human-in-the-loop） | ✅ | ❌ | ✅ |
+| `app_launch` ✏️ | 启动 App（companion 给包名就行） | ⚠️ 要 activity | ✅ | ✅ |
+| `app_list` | 已安装应用列表 | ❌ 要 root | ✅ | ✅ |
+| `fingerprint_auth` ✏️ | 指纹/面容确认（最高级别人工确认） | ✅ | ❌ | ✅ |
+| `voice_transcribe` | 语音转文字 | ✅ | ❌ | ✅ |
+| `ir_blast` ✏️ | 红外发射（万能遥控器） | ✅ | ❌ | ✅ |
+| `usb_list` | USB 口设备盘点 | ✅ | ❌ | ✅ |
+| `media_info` | 当前播放状态 | ✅ | ❌ | ✅ |
 
-✏️ = 写/动作类，`--read-only` 下从列表里消失。完整参数说明：[`docs/TOOLS.md`](docs/TOOLS.md)
+✏️ = 写/动作类，`--read-only` 下从列表里消失；⚠️ = 部分支持（看格子里说明）。完整参数说明：[`docs/TOOLS.md`](docs/TOOLS.md)
 （`python3 droid_mcp.py --dump-tools-md` 生成，保证文档和代码永远一致）。
 companion 的 HTTP 契约：[`docs/PROTOCOL.md`](docs/PROTOCOL.md)。
 
@@ -132,6 +139,35 @@ claude mcp add droid-mcp -- python3 /path/to/droid_mcp.py \
 
 Claude Desktop / OpenCode 等 stdio 客户端：command=`python3`，args=`[/path/to/droid_mcp.py, ...]`，
 flags 照抄上面。
+
+## 手机在兜里，agent 在云端（HTTP 传输）
+
+stdio 要求客户端和 server 同一台机器。手机在兜里、agent 跑云端时：
+
+```bash
+# 手机 Termux 里
+python3 droid_mcp.py --http 0.0.0.0:4844
+# 任意能连上手机的机器
+curl -X POST http://手机IP:4844/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+`POST /mcp` 跑完整 JSON-RPC（`GET /health` 探活）。协议细节和 stdio 完全一致，
+只是换了个信封——局域网用可以，公网请自己套 TLS（见 `docs/SECURITY.md` 诚实区）。
+
+## 网页管家 + 官方 Skill
+
+```bash
+python3 console.py   # → http://127.0.0.1:4855
+```
+
+状态、47 个工具表、实时调用日志、在线试跑，一个页面全齐。
+调用只记工具名/成败/耗时（`~/.droid-mcp/calls.jsonl`），参数内容不落盘。
+
+`skills/phone-assistant/SKILL.md` 是喂给 AI 的“手机使用手册”：
+验证码流程、烧钱操作 double-check、隐私红线。Claude Code / OpenCode
+放到 skills 目录即生效，不用每次口头教。
 
 ## 常见坑（先看这节，能省一小时）
 

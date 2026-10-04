@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 看全已装应用必需（Android 11+ 默认只能看到自己）。自安装包，无 Play 政策问题。 -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <!--
       监听端口 + 上报 Wi-Fi 信息所需（normal 权限，无需用户确认）。
       没有它 ServerSocket 会 EACCES，服务起不来。

@@ -31,7 +31,7 @@ import tempfile
 import urllib.parse
 import urllib.request
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 PROTOCOL_VERSIONS = ("2024-11-05", "2025-03-26", "2025-06-18")
 MAX_TEXT = 12000
 MAX_IMAGE_BYTES = 700_000
@@ -755,6 +755,85 @@ def _t_confirm_dialog(a, be):
     return out if isinstance(out, dict) else {"_raw": out}
 
 
+def _t_app_launch(a, be):
+    package = str(a.get("package", "")).strip()
+    if not package or "/" in package or " " in package:
+        raise ToolError("app_launch 需要 package（应用包名，如 com.example.app）。")
+    if isinstance(be, MockBackend):
+        return {"ok": True, "_note": _mock_note()}
+    if isinstance(be, CompanionBackend):
+        return be.hx("POST", "/api/apps/launch", body={"package": package})
+    activity = str(a.get("activity", "")).strip()
+    if not activity:
+        raise ToolError("Termux 下启动应用需要 activity（包名/启动页，如 .MainActivity）；"
+                        "只给包名就能开的是 companion 后端（它认得 launcher）。")
+    be.tx_raw(["termux-am", "start", "-n", package + "/" + activity], timeout=15)
+    return {"ok": True}
+
+
+def _t_app_list(a, be):
+    if isinstance(be, MockBackend):
+        return {"apps": [{"package": "com.example.mock", "label": "Mock 应用"}],
+                "_note": _mock_note()}
+    if isinstance(be, CompanionBackend):
+        return be.hx("GET", "/api/apps")
+    raise ToolError("app_list companion 独占：Termux 下列应用要 root，用 companion 后端。")
+
+
+def _t_fingerprint_auth(a, be):
+    if isinstance(be, MockBackend):
+        return {"auth_result": "AUTH_RESULT_SUCCESS", "_note": _mock_note()}
+    if isinstance(be, CompanionBackend):
+        _need_termux("fingerprint_auth")
+    argv = ["-t", str(a.get("title", "droid-mcp 请求确认"))]
+    if a.get("description"):
+        argv += ["-d", str(a["description"])]
+    out = be.tx("fingerprint", argv, timeout=120)
+    return out if isinstance(out, dict) else {"_raw": out}
+
+
+def _t_voice_transcribe(a, be):
+    if isinstance(be, MockBackend):
+        return {"text": "mock 语音转写：明天下午三点开会", "_note": _mock_note()}
+    if isinstance(be, CompanionBackend):
+        _need_termux("voice_transcribe")
+    # 无参数：直接听， partial 结果流里取第一段完整文本（走 Google 语音服务，要联网）
+    out = be.tx("speech-to-text", [], timeout=40)
+    return out if isinstance(out, dict) else {"text": out}
+
+
+def _t_ir_blast(a, be):
+    try:
+        freq = int(a.get("frequency", 38000))
+    except (TypeError, ValueError):
+        raise ToolError("frequency 得是数字（常见 36000/38000/40000）。")
+    pattern = str(a.get("pattern", "")).strip()
+    if not pattern:
+        raise ToolError("ir_blast 需要 pattern（红外码，逗号分隔的整数序列）与 frequency。")
+    if isinstance(be, MockBackend):
+        return {"ok": True, "_note": _mock_note()}
+    if isinstance(be, CompanionBackend):
+        _need_termux("ir_blast")
+    be.tx_raw(["termux-infrared-transmit", "-f", str(freq), pattern], timeout=10)
+    return {"ok": True}
+
+
+def _t_usb_list(a, be):
+    if isinstance(be, MockBackend):
+        return {"devices": [], "_note": _mock_note()}
+    if isinstance(be, CompanionBackend):
+        _need_termux("usb_list")
+    return be.tx("usb", ["-l"], timeout=10)
+
+
+def _t_media_info(a, be):
+    if isinstance(be, MockBackend):
+        return {"state": "stopped", "_note": _mock_note()}
+    if isinstance(be, CompanionBackend):
+        _need_termux("media_info")
+    return be.tx("media-player", ["info"], timeout=10)
+
+
 # ================================================================ 注册表
 
 def _S(desc, required=(), props=None, companion=True):
@@ -820,54 +899,54 @@ TOOLS = [
            props={"ms": {**_I, "description": "毫秒，默认 200，最大 10000"}})},
     {"name": "torch", "fn": _t_torch,
      **_M("手电筒开关。",
-           props={"on": {"type": "boolean", "description": "默认 true"}}),
-     "companion": False},
+           props={"on": {"type": "boolean", "description": "默认 true"}},
+           companion=False)},
     {"name": "brightness_set", "fn": _t_brightness_set,
      **_M("屏幕亮度 1-255。",
-           props={"value": {**_I, "description": "默认 128"}}),
-     "companion": False},
+           props={"value": {**_I, "description": "默认 128"}},
+           companion=False)},
     {"name": "volume_set", "fn": _t_volume_set,
      **_M("调音量。",
            props={"stream": {**_ST, "description": "alarm/music/notification/ring/system/voicecall/dtmf"},
-                  "value": {**_I, "description": "0-15"}}),
-     "companion": False},
+                  "value": {**_I, "description": "0-15"}},
+           companion=False)},
     {"name": "wallpaper_set", "fn": _t_wallpaper_set,
      **_M("换壁纸（手机上的图片路径）。",
            required=("path",),
-           props={"path": _ST, "lockscreen": {"type": "boolean", "description": "同时设锁屏"}}),
-     "companion": False},
+           props={"path": _ST, "lockscreen": {"type": "boolean", "description": "同时设锁屏"}},
+           companion=False)},
     {"name": "media_scan", "fn": _t_media_scan,
      **_M("通知系统扫描文件（新照片/录音不出现在图库时用它）。",
            required=("paths",),
            props={"paths": {"type": "array", "items": _ST},
-                  "recursive": {"type": "boolean"}}),
-     "companion": False},
+                  "recursive": {"type": "boolean"}},
+           companion=False)},
     {"name": "media_play", "fn": _t_media_play,
      **_M("放一个音频文件。",
-           required=("path",), props={"path": _ST}),
-     "companion": False},
+           required=("path",), props={"path": _ST},
+           companion=False)},
     {"name": "camera_photo", "fn": _t_camera_photo,
      **_M("拍一张照片存手机上（回路径，不回图，省 token）。",
            props={"path": {**_ST, "description": "默认临时目录"},
-                  "camera": {**_I, "description": "摄像头 id，见 camera_info"}}),
-     "companion": False},
+                  "camera": {**_I, "description": "摄像头 id，见 camera_info"}},
+           companion=False)},
     {"name": "mic_record", "fn": _t_mic_record,
      **_M("录音（回文件路径）。",
            props={"seconds": {**_I, "description": "默认 10，最长 120"},
-                  "path": {**_ST, "description": "默认临时目录"}}),
-     "companion": False},
+                  "path": {**_ST, "description": "默认临时目录"}},
+           companion=False)},
     {"name": "tts_speak", "fn": _t_tts_speak,
      **_M("手机开口说话（TTS）。",
            required=("text",),
            props={"text": _ST, "language": {**_ST, "description": "如 eng-USA"},
-                  "rate": {"type": "number"}}),
-     "companion": False},
+                  "rate": {"type": "number"}},
+           companion=False)},
     {"name": "tts_engines", "fn": _t_tts_engines,
      **_S("可用的 TTS 引擎列表。", companion=False)},
     {"name": "screenshot", "fn": _t_screenshot,
      **_S("截屏。小图内嵌回传，大图只给路径。",
-           props={"path": {**_ST, "description": "默认临时目录"}}),
-     "companion": False},
+           props={"path": {**_ST, "description": "默认临时目录"}},
+           companion=False)},
     {"name": "location", "fn": _t_location,
      **_S("定位。室内用 network，室外要精度用 gps（慢）。",
            props={"provider": {**_ST, "description": "gps/network/passive，默认 network"}})},
@@ -877,16 +956,16 @@ TOOLS = [
      **_S("扫描周围 Wi-Fi（要开定位开关，安卓规定的）。", companion=False)},
     {"name": "wifi_toggle", "fn": _t_wifi_toggle,
      **_M("Wi-Fi 开关。",
-           props={"on": {"type": "boolean", "description": "默认 true"}}),
-     "companion": False},
+           props={"on": {"type": "boolean", "description": "默认 true"}},
+           companion=False)},
     {"name": "sensor_list", "fn": _t_sensor_list,
      **_S("手机有哪些传感器。", companion=False)},
     {"name": "sensor_read", "fn": _t_sensor_read,
      **_S("读传感器（加速度/陀螺仪/光线…，做手机机器人必备）。",
            props={"sensors": {**_ST, "description": "逗号分隔，默认 accelerometer"},
                   "count": {**_I, "description": "读几次，默认 3，最大 50"},
-                  "delay_ms": _I}),
-     "companion": False},
+                  "delay_ms": _I},
+           companion=False)},
     {"name": "audio_info", "fn": _t_audio_info,
      **_S("音频系统信息（有哪些输出流）。", companion=False)},
     {"name": "camera_info", "fn": _t_camera_info,
@@ -907,18 +986,43 @@ TOOLS = [
                   "overwrite": {"type": "boolean"}})},
     {"name": "share_file", "fn": _t_share_file,
      **_M("调起系统分享面板分享文件。",
-           required=("path",), props={"path": _ST}),
-     "companion": False},
+           required=("path",), props={"path": _ST},
+           companion=False)},
     {"name": "open_url", "fn": _t_open_url,
      **_M("在手机浏览器打开链接。",
-           required=("url",), props={"url": _ST}),
-     "companion": False},
+           required=("url",), props={"url": _ST},
+           companion=False)},
     {"name": "confirm_dialog", "fn": _t_confirm_dialog,
      **_M("在手机上弹确认框等人点（human-in-the-loop，AI 等你拍板再往下走）。"
            "注意：会阻塞到超时（120s），超时算失败。",
            props={"title": {**_ST, "description": "默认 请确认"},
-                  "hint": _ST}),
-     "companion": False},
+                  "hint": _ST},
+           companion=False)},
+    {"name": "app_launch", "fn": _t_app_launch,
+     **_M("启动手机上的 App。companion 给包名就行；Termux 下要再给 activity。",
+           required=("package",),
+           props={"package": {**_ST, "description": "如 com.example.app"},
+                  "activity": {**_ST, "description": "Termux 独占，如 .MainActivity"}})},
+    {"name": "app_list", "fn": _t_app_list,
+     **_S("已安装应用列表（包名+名称）。companion 独占，Termux 下要 root 才行。")},
+    {"name": "fingerprint_auth", "fn": _t_fingerprint_auth,
+     **_M("指纹/面容确认：最高级别的人工确认，比确认框更正式（解锁、转账类场景）。"
+           "会阻塞等你按指纹，超时算失败。",
+           props={"title": _ST, "description": _ST},
+           companion=False)},
+    {"name": "voice_transcribe", "fn": _t_voice_transcribe,
+     **_S("听一段语音转文字（走系统语音服务，要联网）。开会录音转纪要就靠它。",
+           companion=False)},
+    {"name": "ir_blast", "fn": _t_ir_blast,
+     **_M("红外发射（有红外头的手机当万能遥控器）。",
+           required=("frequency", "pattern"),
+           props={"frequency": {**_I, "description": "载波，常见 38000"},
+                  "pattern": {**_ST, "description": "逗号分隔的整数序列"}},
+           companion=False)},
+    {"name": "usb_list", "fn": _t_usb_list,
+     **_S("USB 口上插了啥（OTG 设备盘点）。", companion=False)},
+    {"name": "media_info", "fn": _t_media_info,
+     **_S("当前播放状态（谁在放歌）。", companion=False)},
 ]
 
 BY_NAME = {t["name"]: t for t in TOOLS}
@@ -933,14 +1037,18 @@ def visible_tools():
 
 # ================================================================ 后端选择
 
-def select_backend():
-    if _MOCK_FLAG or BACKEND_WANT == "mock":
+def select_backend(want=None, companion_url=None, token=None):
+    """选后端。参数不给就读 CLI/env（给 console.py 留后门传参）。"""
+    want = (want or BACKEND_WANT or "auto").lower()
+    companion_url = companion_url if companion_url is not None else COMPANION_URL
+    token = token if token is not None else COMPANION_TOKEN
+    if _MOCK_FLAG or want == "mock":
         return MockBackend()
-    if BACKEND_WANT == "companion" or (BACKEND_WANT == "auto" and COMPANION_URL):
-        if not COMPANION_URL:
+    if want == "companion" or (want == "auto" and companion_url):
+        if not companion_url:
             raise ToolError("companion 后端需要 --companion http://手机IP:4833（+ --token）。")
-        return CompanionBackend(COMPANION_URL, COMPANION_TOKEN)
-    if BACKEND_WANT == "termux" or BACKEND_WANT == "auto":
+        return CompanionBackend(companion_url, token)
+    if want == "termux" or want == "auto":
         if TermuxBackend.available():
             return TermuxBackend()
         raise ToolError(
@@ -949,6 +1057,34 @@ def select_backend():
             "2) companion APK（不用 Termux）：--backend companion --companion http://手机IP:4833 --token xxx\n"
             "3) 先玩起来：--mock")
     raise ToolError("--backend 只能是 auto/termux/companion/mock。")
+
+
+def _log_path():
+    p = os.environ.get("DROID_MCP_LOG", os.path.join(
+        os.path.expanduser("~"), ".droid-mcp", "calls.jsonl"))
+    if p.lower() == "off":
+        return None
+    return p
+
+
+def log_call(tool, ok, ms):
+    """调用审计日志：给 console.py 看。只记工具名+成败+耗时，不记参数（短信内容不落盘）。"""
+    path = _log_path()
+    if not path:
+        return
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            import time
+            f.write(json.dumps({"ts": time.strftime("%H:%M:%S"), "tool": tool,
+                                "ok": ok, "ms": ms}, ensure_ascii=False) + "\n")
+        if os.path.getsize(path) > 200 * 1024:  # 200KB 就只留后 500 行
+            with open(path, encoding="utf-8") as f:
+                lines = f.readlines()[-500:]
+            with open(path, "w", encoding="utf-8") as f:
+                f.writelines(lines)
+    except OSError:
+        pass
 
 
 # ================================================================ JSON-RPC
@@ -1046,12 +1182,16 @@ def dump_tools_md():
 def main():
     if "--dump-tools-md" in _argv:
         return dump_tools_md()
+    http_at = _opt("--http")
     try:
         be = select_backend()
     except ToolError as e:
         sys.stderr.write("droid-mcp 启动失败：%s\n" % e)
         sys.exit(2)
+    if http_at:
+        return serve_http(http_at, be)
     log("droid-mcp %s 启动（backend=%s read_only=%s）" % (VERSION, be.name, READ_ONLY))
+    import time
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -1060,14 +1200,84 @@ def main():
             req = json.loads(line)
         except json.JSONDecodeError:
             continue
+        t0 = time.time()
         try:
             resp = handle(req, be)
         except Exception as e:
             log("handle crashed: %r" % e)
             resp = _err(req.get("id"), -32603, "内部错误")
+        if isinstance(req, dict) and req.get("method") == "tools/call":
+            ok = not ((resp or {}).get("result") or {}).get("isError", False)
+            log_call(str((req.get("params") or {}).get("name", "?")), ok,
+                     int((time.time() - t0) * 1000))
         if resp is not None:
             sys.stdout.write(json.dumps(resp, ensure_ascii=False) + "\n")
             sys.stdout.flush()
+
+
+def serve_http(at, be):
+    """MCP over HTTP（Streamable HTTP 极简版）：POST /mcp 跑 JSON-RPC，
+    通知回 202，GET /health 给探针。手机在兜里、agent 在云端时就靠它。"""
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    host, port = at.rsplit(":", 1) if ":" in at else ("0.0.0.0", at or "4844")
+    try:
+        port = int(port)
+    except ValueError:
+        sys.stderr.write("--http 格式：host:port（如 0.0.0.0:4844）\n")
+        sys.exit(2)
+
+    import time as _t
+
+    class H(BaseHTTPRequestHandler):
+        server_version = "droid-mcp/" + VERSION
+
+        def log_message(self, *a):
+            pass
+
+        def _send(self, code, obj, ctype="application/json"):
+            body = b"" if obj is None else json.dumps(obj, ensure_ascii=False).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            if body:
+                self.wfile.write(body)
+
+        def do_GET(self):
+            if self.path == "/health":
+                return self._send(200, {"ok": True, "name": "droid-mcp",
+                                        "version": VERSION, "backend": be.name})
+            return self._send(404, {"ok": False, "error": "只要 /mcp 与 /health"})
+
+        def do_POST(self):
+            if self.path != "/mcp":
+                return self._send(404, {"ok": False, "error": "只要 /mcp 与 /health"})
+            try:
+                n = int(self.headers.get("Content-Length", 0))
+            except ValueError:
+                return self._send(400, {"jsonrpc": "2.0", "id": None,
+                                        "error": {"code": -32700, "message": "坏请求"}})
+            try:
+                req = json.loads(self.rfile.read(n).decode() or "{}")
+            except json.JSONDecodeError:
+                return self._send(400, {"jsonrpc": "2.0", "id": None,
+                                        "error": {"code": -32700, "message": "JSON 解析失败"}})
+            t0 = _t.time()
+            try:
+                resp = handle(req, be)
+            except Exception as e:
+                log("handle crashed: %r" % e)
+                resp = _err(req.get("id"), -32603, "内部错误")
+            if isinstance(req, dict) and req.get("method") == "tools/call":
+                ok = not ((resp or {}).get("result") or {}).get("isError", False)
+                log_call(str((req.get("params") or {}).get("name", "?")), ok,
+                         int((_t.time() - t0) * 1000))
+            if resp is None:
+                return self._send(202, None)
+            return self._send(200, resp)
+
+    log("droid-mcp %s HTTP 模式（backend=%s）：http://%s:%d/mcp" % (VERSION, be.name, host, port))
+    ThreadingHTTPServer((host, port), H).serve_forever()
 
 
 if __name__ == "__main__":

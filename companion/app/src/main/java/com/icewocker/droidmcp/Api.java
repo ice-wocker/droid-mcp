@@ -168,6 +168,11 @@ public final class Api {
                     return Router.badArgs("该端点只支持 GET");
                 }
                 return apps(ctx);
+            } else if ("/api/apps/launch".equals(path)) {
+                if (!"POST".equals(method)) {
+                    return Router.badArgs("该端点只支持 POST（JSON body）");
+                }
+                return appLaunch(ctx, query, body);
             }
             Router.Response r = Router.badArgs("未知端点：" + path);
             return new Router.Response(404, r.json);
@@ -778,6 +783,27 @@ public final class Api {
         JSONObject d = new JSONObject();
         d.put("apps", arr);
         d.put("count", arr.length());
+        return Router.ok(d);
+    }
+
+    // ---- 21. 启动应用 ----
+
+    private static Router.Response appLaunch(Context ctx, Map<String, String> query,
+                                             JSONObject body) throws Exception {
+        String pkg = strArg(query, body, "package", "").trim();
+        if (pkg.isEmpty()) {
+            return Router.badArgs("缺少 package（应用包名）");
+        }
+        PackageManager pm = ctx.getPackageManager();
+        Intent it = pm.getLaunchIntentForPackage(pkg);
+        if (it == null) {
+            return Router.unavailable("这个包没有可启动的入口：" + pkg);
+        }
+        it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        ctx.startActivity(it);
+        JSONObject d = new JSONObject();
+        d.put("ok", true);
+        d.put("package", pkg);
         return Router.ok(d);
     }
 

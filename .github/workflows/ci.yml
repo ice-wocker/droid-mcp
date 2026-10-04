@@ -16,5 +16,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install pytest
-      - run: python -m compileall -q droid_mcp.py
-      - run: python -m pytest test_droid_mcp.py -q
+      - run: python -m compileall -q droid_mcp.py console.py
+      - run: python -m pytest -q
+      - name: docs/TOOLS.md 与代码一致（--dump-tools-md 生成，改工具记得刷）
+        run: |
+          python droid_mcp.py --dump-tools-md > /tmp/TOOLS.check.md
+          diff -q /tmp/TOOLS.check.md docs/TOOLS.md

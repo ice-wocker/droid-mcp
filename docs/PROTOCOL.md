@@ -49,6 +49,7 @@ AI 客户端 --stdio/MCP--> droid_mcp.py --HTTP/局域网--> companion APK（手
 | GET `/api/storage/read` | `path`、`max_bytes?`（默认 64KB） | 读文本文件 |
 | POST `/api/storage/write` | `path`、`text`、`overwrite?`（默认 false） | 写文本文件 |
 | GET `/api/apps` | – | 已安装应用（包名+名称，不含系统隐藏项） |
+| POST `/api/apps/launch` | `package` | 启动应用 |
 
 不在表里的（如截屏/相机/传感器）：v1 companion 不做，用 Termux 后端。
 Python 端调到 companion 不支持的工具时，报“切 Termux 后端或等后续版本”，不撒谎。

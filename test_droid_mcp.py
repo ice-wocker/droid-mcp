@@ -10,7 +10,7 @@ MUTATING = {"sms_send", "call_dial", "clipboard_set", "notify",
             "brightness_set", "volume_set", "wallpaper_set", "media_scan",
             "media_play", "camera_photo", "mic_record", "tts_speak",
             "wifi_toggle", "storage_write", "share_file", "open_url",
-            "confirm_dialog"}
+            "confirm_dialog", "app_launch", "fingerprint_auth", "ir_blast"}
 
 
 class Client:
@@ -59,7 +59,7 @@ def test_initialize_negotiation():
     try:
         r = c.call("initialize", {"protocolVersion": "2025-06-18"})
         assert r["result"]["protocolVersion"] == "2025-06-18"
-        assert r["result"]["serverInfo"] == {"name": "droid-mcp", "version": "0.2.0"}
+        assert r["result"]["serverInfo"] == {"name": "droid-mcp", "version": "0.3.0"}
         r2 = c.call("initialize", {"protocolVersion": "2099-01-01"})
         assert r2["result"]["protocolVersion"] == "2025-06-18"
     finally:
@@ -78,14 +78,14 @@ def test_ping_and_notifications():
         c.close()
 
 
-def test_tools_list_has_40():
+def test_tools_list_has_47():
     c = Client("--mock")
     try:
         tools = c.call("tools/list")["result"]["tools"]
-        assert len(tools) == 40, [t["name"] for t in tools]
+        assert len(tools) == 47, [t["name"] for t in tools]
         mut = [t["name"] for t in tools
                if t["name"] in MUTATING]
-        assert len(mut) == 21, mut
+        assert len(mut) == 24, mut
         for t in tools:
             assert t["inputSchema"]["type"] == "object"
             assert t["description"]
@@ -94,7 +94,7 @@ def test_tools_list_has_40():
 
 
 def test_all_tools_callable_in_mock():
-    """40 个工具在 mock 下全调一遍：有参给最小参，没 isError 才算过。"""
+    """47 个工具在 mock 下全调一遍：有参给最小参，没 isError 才算过。"""
     args = {"sms_inbox": {"limit": 1}, "call_log": {"limit": 1},
             "sms_send": {"to": "13800138000", "body": "hi"},
             "call_dial": {"number": "13800138000"},
@@ -109,7 +109,10 @@ def test_all_tools_callable_in_mock():
             "share_file": {"path": "/sdcard/a.jpg"}, "open_url": {"url": "https://example.com"},
             "location": {"provider": "network"}, "mic_record": {"seconds": 2},
             "tts_speak": {"text": "hi"}, "confirm_dialog": {"title": "t"},
-            "wifi_toggle": {"on": True}, "camera_photo": {}}
+            "wifi_toggle": {"on": True}, "camera_photo": {},
+            "app_launch": {"package": "com.example.mock"},
+            "ir_blast": {"frequency": 38000, "pattern": "100,200"},
+            "fingerprint_auth": {}}
     c = Client("--mock")
     try:
         bad = []
@@ -157,7 +160,7 @@ def test_read_only_hides_all_21_mutating():
     try:
         names = set(_names(c))
         assert not (names & MUTATING), names & MUTATING
-        assert len(names) == 19
+        assert len(names) == 23
         r = c.call("tools/call", {"name": "notify", "arguments": {"content": "hi"}})
         assert r["result"]["isError"] is True
     finally:
@@ -204,6 +207,22 @@ def test_companion_unreachable_gives_guide():
         assert c.p.stdout.readline() == ""
     finally:
         c.close()
+
+
+def test_companion_matrix_is_explicit():
+    """防回归：companion 不支持集必须显式声明（曾出现过死键导致 17 个工具误标 ✅）。"""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("dm", SERVER)
+    dm = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dm)
+    no = {t["name"] for t in dm.TOOLS if not t.get("_companion", True)}
+    assert no == {"audio_info", "brightness_set", "camera_info", "camera_photo",
+                  "cell_info", "confirm_dialog", "fingerprint_auth", "ir_blast",
+                  "media_info", "media_play", "media_scan", "mic_record",
+                  "notification_list", "open_url", "screenshot", "sensor_list",
+                  "sensor_read", "share_file", "torch", "tts_engines",
+                  "tts_speak", "usb_list", "voice_transcribe", "volume_set",
+                  "wallpaper_set", "wifi_scan", "wifi_toggle"}, no
 
 
 def test_storage_jail_blocks_escape():
