@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">droid-mcp companion</string>
+    <string name="title">droid-mcp 手机伴侣 v0.2.0</string>
+    <string name="token_hint">token：…（启动中）</string>
+    <string name="status_hint">服务状态：…</string>
+    <string name="perm_hint">权限：…</string>
+    <string name="start">启动服务</string>
+    <string name="stop">停止服务</string>
+    <string name="allow_sms">允许发送短信（/api/sms/send）</string>
+    <string name="allow_dial">允许直接拨号（/api/call/dial）</string>
+    <string name="about">安全边界：只监听局域网，不打洞、不上云，关 App 即关服务；token 在本屏幕，一机一 token；发短信/拨号默认关闭，需手动开开关；完整 /sdcard 访问需去设置里开“所有文件访问权限”，否则 storage 只给 Download 和 App 目录。</string>
+</resources>
