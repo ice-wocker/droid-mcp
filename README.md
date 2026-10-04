@@ -1,25 +1,42 @@
 # droid-mcp 📱
 
 [![CI](https://github.com/ice-wocker/droid-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ice-wocker/droid-mcp/actions/workflows/ci.yml)
+[![Companion APK](https://github.com/ice-wocker/droid-mcp/actions/workflows/companion.yml/badge.svg)](https://github.com/ice-wocker/droid-mcp/actions/workflows/companion.yml)
 [![GitHub stars](https://img.shields.io/github/stars/ice-wocker/droid-mcp?style=social)](https://github.com/ice-wocker/droid-mcp/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue.svg)](droid_mcp.py)
 
-**Your Android phone as MCP tools. One stdlib-only Python file, any MCP client.**
+**Your Android phone as MCP tools: 40 tools, 3 backends, 1 file.**
 
-**你的安卓手机，变成 MCP 工具。一个纯标准库 Python 文件，任意 MCP 客户端即插即用。**
+**你的安卓手机，变成 MCP 工具：40 个工具，3 种接法，1 个文件。**
 
 如果觉得有用，点个 ⭐ 吧！
 
-## 30 秒上手
+## 30 秒上手（三选一）
 
-手机上装好 Termux + Termux:API（`pkg install termux-api`），然后：
+**A. 手机 Termux 里跑（功能最全，40/40）**
 
 ```bash
-git clone https://github.com/ice-wocker/droid-mcp.git && cd droid-mcp
+pkg install termux-api python git && git clone https://github.com/ice-wocker/droid-mcp.git
+cd droid-mcp && claude mcp add droid-mcp -- python3 $(pwd)/droid_mcp.py
+```
 
-# Claude Code 一行接入
-claude mcp add droid-mcp -- python3 $(pwd)/droid_mcp.py
+**B. companion APK（不用装 Termux，19/40，数据类全覆盖）**
+
+去 [Releases](https://github.com/ice-wocker/droid-mcp/releases) 下 companion APK，
+手机上打开，允许要的权限，屏幕上有 token 和 IP，然后：
+
+```bash
+claude mcp add droid-mcp -- python3 droid_mcp.py \
+  --backend companion --companion http://192.168.1.5:4833 --token 屏幕上那串
+```
+
+详细步骤与各厂商权限在哪开：[`docs/COMPANION.md`](docs/COMPANION.md)。
+
+**C. 先玩起来（无手机，40/40 全是假数据）**
+
+```bash
+python3 droid_mcp.py --mock
 ```
 
 然后直接跟 AI 说话：
@@ -27,121 +44,117 @@ claude mcp add droid-mcp -- python3 $(pwd)/droid_mcp.py
 ```
 你：刚注册的那个网站，短信验证码多少？
 AI：● sms_inbox
-    482916（MockPay，5 分钟内有效）。要我帮你填吗？
-你：顺手弹个通知提醒我 10 分钟后看邮箱
-AI：● notify
-    已发通知。
+    482916（MockPay，5 分钟内有效）。要我帮你填进剪贴板吗？
+你：帮我录 10 秒备忘，再弹个通知提醒我听
+AI：● mic_record → /sdcard/Download/droid-mcp-rec.m4a
+    ● notify → 已发通知。
 ```
 
-没手机在手边？`--mock` 先玩起来（CI 也是这么测的）：
+## 兼容矩阵（核心）
 
-```bash
-python3 droid_mcp.py --mock
-```
+`--backend auto`（默认）会自动选：有 `termux-*` 就用 Termux，否则看有没有给
+`--companion`，都没有就报错指路（exit 2，三选一指南直接打到 stderr）。
 
-## 12 个工具
+| 工具 | 干嘛 | termux | companion | mock |
+|---|---|---|---|---|
+| `device_info` | 厂商/机型/安卓版本 | ✅ | ✅ | ✅ |
+| `battery` | 电量/充电/健康度/温度 | ✅ | ✅ | ✅ |
+| `sms_inbox` | 读短信（找验证码） | ✅ | ✅ | ✅ |
+| `sms_send` ✏️ | 发短信（companion 内默认关，需手动开） | ✅ | ✅ | ✅ |
+| `call_log` | 通话记录 | ✅ | ✅ | ✅ |
+| `call_dial` ✏️ | 直接拨号（会产生话费） | ✅ | ✅ | ✅ |
+| `contacts` | 通讯录 | ✅ | ✅ | ✅ |
+| `clipboard_get` | 读剪贴板 | ✅ | ✅ | ✅ |
+| `clipboard_set` ✏️ | 写剪贴板 | ✅ | ✅ | ✅ |
+| `notify` ✏️ | 发系统通知 | ✅ | ✅ | ✅ |
+| `notification_remove` ✏️ | 撤通知 | ✅ | ✅ | ✅ |
+| `notification_list` | 通知栏都有啥 | ✅ | ❌ | ✅ |
+| `toast` ✏️ | 底部小提示 | ✅ | ✅ | ✅ |
+| `vibrate` ✏️ | 震动 | ✅ | ✅ | ✅ |
+| `torch` ✏️ | 手电筒 | ✅ | ❌ | ✅ |
+| `brightness_set` ✏️ | 屏幕亮度 | ✅ | ❌ | ✅ |
+| `volume_set` ✏️ | 调音量 | ✅ | ❌ | ✅ |
+| `wallpaper_set` ✏️ | 换壁纸 | ✅ | ❌ | ✅ |
+| `media_scan` ✏️ | 扫文件进图库 | ✅ | ❌ | ✅ |
+| `media_play` ✏️ | 放音频 | ✅ | ❌ | ✅ |
+| `camera_photo` ✏️ | 拍照（回路径，省 token） | ✅ | ❌ | ✅ |
+| `mic_record` ✏️ | 录音（回路径） | ✅ | ❌ | ✅ |
+| `tts_speak` ✏️ | 手机开口说话 | ✅ | ❌ | ✅ |
+| `tts_engines` | TTS 引擎列表 | ✅ | ❌ | ✅ |
+| `screenshot` | 截屏（小图内嵌，大图给路径） | ✅ | ❌ | ✅ |
+| `location` | 定位（network 快/gps 准） | ✅ | ✅ | ✅ |
+| `wifi_status` | 当前 Wi-Fi | ✅ | ✅ | ✅ |
+| `wifi_scan` | 扫周围 Wi-Fi（要开定位开关） | ✅ | ❌ | ✅ |
+| `wifi_toggle` ✏️ | Wi-Fi 开关 | ✅ | ❌ | ✅ |
+| `sensor_list` | 有哪些传感器 | ✅ | ❌ | ✅ |
+| `sensor_read` | 读传感器（机器人眼睛） | ✅ | ❌ | ✅ |
+| `audio_info` | 音频系统信息 | ✅ | ❌ | ✅ |
+| `camera_info` | 摄像头列表 | ✅ | ❌ | ✅ |
+| `cell_info` | 基站/信号 | ✅ | ❌ | ✅ |
+| `storage_list` | 列手机目录（沙盒内） | ✅ | ✅ | ✅ |
+| `storage_read` | 读文本文件 | ✅ | ✅ | ✅ |
+| `storage_write` ✏️ | 写文本文件（默认不覆盖） | ✅ | ✅ | ✅ |
+| `share_file` ✏️ | 系统分享面板 | ✅ | ❌ | ✅ |
+| `open_url` ✏️ | 浏览器打开链接 | ✅ | ❌ | ✅ |
+| `confirm_dialog` ✏️ | 手机弹确认框等人点（human-in-the-loop） | ✅ | ❌ | ✅ |
 
-| 工具 | 干嘛 | 写操作 |
-|---|---|---|
-| `device_info` | 机型/安卓版本，先调它确认连的是哪台手机 | – |
-| `battery` | 电量/充电/健康度/温度 | – |
-| `sms_inbox` | 读短信（找验证码的主力），`limit/offset` | – |
-| `call_log` | 通话记录 | – |
-| `contacts` | 通讯录 | – |
-| `clipboard_get` | 读手机剪贴板 | – |
-| `clipboard_set` | 写手机剪贴板（验证码直达剪贴板） | ✅ |
-| `notify` | 发系统通知（“跑完了叫我”） | ✅ |
-| `toast` | 底部小提示 | ✅ |
-| `screenshot` | 截屏（小图内嵌回传，大图给路径） | – |
-| `location` | 定位（network 快 / gps 准） | – |
-| `wifi_status` | 当前 Wi-Fi（SSID/信号/速率） | – |
-
- paranoid → `droid_mcp.py --read-only`：写入类工具直接从列表里消失，调也调不动。
+✏️ = 写/动作类，`--read-only` 下从列表里消失。完整参数说明：[`docs/TOOLS.md`](docs/TOOLS.md)
+（`python3 droid_mcp.py --dump-tools-md` 生成，保证文档和代码永远一致）。
+companion 的 HTTP 契约：[`docs/PROTOCOL.md`](docs/PROTOCOL.md)。
 
 ## 为什么是 droid-mcp？
 
 |  | ADB / scrcpy 方案 | Tasker 方案 | droid-mcp |
 |---|---|---|---|
-| AI 直接用 | ❌ 要人肉中转 | ❌ 要配 HTTP 插件 | ✅ MCP 原生，Claude Code 零配置消费 |
-| 依赖 | 电脑+数据线/配对 | 付费 App+插件 | Termux + 免费的 Termux:API |
-| 体积 | SDK 几百 MB | 重 | **1 个文件，0 第三方依赖** |
-| 隐私 | 取决于你怎么搭 | 云端账号 | 全程本机/局域网，无云 |
+| AI 直接用 | ❌ 人肉中转 | ❌ 配 HTTP 插件 | ✅ MCP 原生 |
+| 不装 Termux 能用吗 | 要配 adb | 要买 App | ✅ companion APK |
+| 依赖 | SDK 几百 MB | 付费+插件 | **1 个 py 文件 / 1 个 APK，0 第三方依赖** |
+| 隐私 | 看你怎么搭 | 云端账号 | 全程本机/局域网，无云 |
 
-## 隐私
+## 隐私与安全模型
 
-- 短信/联系人/位置只在**你的手机内存里**过一遍，进的是**你自己的** AI 会话，不经过本项目任何服务器（本项目就没有服务器）。
-- 实在不放心：`--read-only` + 客户端侧的工具审批（Claude Code 默认每次都问你）。
-- `--mock` 里的演示数据全是 555 虚构号段。
+1. **没服务器**：短信/联系人/位置只在你手机内存里过一遍，进的是你自己的 AI 会话。
+2. **局域网 + token**：companion 只监听 4833，不打洞；token 在手机屏幕上，一机一换。
+3. **烧钱操作双保险**：`sms_send` / `call_dial` 在 companion App 内默认关闭（手动开开关），
+   MCP 客户端侧还有工具审批（Claude Code 默认每次都问）。
+4. **存储沙盒**：`storage_*` 只允许 /sdcard 与家目录，`../` 越狱会被拦（有单测）。
+5. **mock 全是 555 虚构号段**，截图大了不内嵌。
 
 ## 客户端配置
 
-<details>
-<summary>Claude Code（CLI，一行）</summary>
+```bash
+# Claude Code
+claude mcp add droid-mcp -- python3 /path/to/droid_mcp.py
+# companion 版（示例 IP/token 换你自己的）
+claude mcp add droid-mcp -- python3 /path/to/droid_mcp.py \
+  --backend companion --companion http://192.168.1.5:4833 --token xxx
+```
+
+Claude Desktop / OpenCode 等 stdio 客户端：command=`python3`，args=`[/path/to/droid_mcp.py, ...]`，
+flags 照抄上面。
+
+## 常见坑（先看这节，能省一小时）
+
+| 症状 | 原因 | 解法 |
+|---|---|---|
+| `termux-* 空输出/超时` | 没给 Termux:API 授权，或手机息屏 | 亮屏，手机上打开 Termux:API 点授权 |
+| `companion 说不：denied` | 系统权限/开关没开 | 看 App 里那行字写去哪开，见 `docs/COMPANION.md` 厂商表 |
+| `gps 定位半天不出` | 物理规律，室内搜不到星 | 先用 network；gps 去窗边 |
+| `wifi_scan 空` | 安卓要求开定位开关才给扫 | 设置里打开定位（不用开 gps 精度） |
+| `screenshot 不可用` | 旧版 Termux:API 没这个命令 | 升级 Termux:API，或用 camera_photo |
+| 小米/MIUI 收不到通知 | MIUI 杀后台 | 锁后台 + 自启动，见厂商表 |
+| 华为没 Termux:API 用 | —— | 直接用 companion APK（就是为这个生的） |
+
+## 开发
 
 ```bash
-claude mcp add droid-mcp -- python3 /path/to/droid_mcp.py
-# 只读版：claude mcp add droid-mcp-ro -- python3 /path/to/droid_mcp.py --read-only
+pip install pytest && pytest -q   # 12 用例，mock 模式，无需真机
 ```
 
-</details>
+加新工具三件套：`droid_mcp.py` 里加实现 + 注册表 + mock 数据，`test_droid_mcp.py` 加用例，
+`docs/TOOLS.md` 用 `--dump-tools-md` 重新生成。改协议先改 `docs/PROTOCOL.md`。
 
-<details>
-<summary>Claude Desktop / 任意 stdio 客户端（JSON）</summary>
-
-```json
-{
-  "mcpServers": {
-    "droid-mcp": {
-      "command": "python3",
-      "args": ["/path/to/droid_mcp.py"]
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary>OpenCode</summary>
-
-OpenCode 配 MCP（`opencode.json`）：
-
-```jsonc
-{
-  "mcp": {
-    "droid-mcp": {
-      "type": "local",
-      "command": ["python3", "/path/to/droid_mcp.py"]
-    }
-  }
-}
-```
-
-</details>
-
-## 要求
-
-- 手机：Termux + Termux:API App（`pkg install termux-api`），并给短信/联系人/定位授权
-- 跑 server 这端：Python >= 3.10（跑在手机 Termux 里就行，也可以跑在同一局域网的电脑上——stdio 模式需要跟客户端同机，远程场景用 SSH 管道）
-- 开发/测试：`pip install pytest`，`pytest` 全绿（10 用例，mock 模式，无需真机）
-
-## 结构（就这几个文件）
-
-```
-droid_mcp.py       单文件 server：MCP(stdio/NDJSON) + 12 工具 + mock/只读模式
-test_droid_mcp.py  10 个 pytest：握手/工具列表/mock 调用/只读/无 API 降级
-.github/workflows/ci.yml  3.10–3.13 全绿
-```
-
-## 已知限制（诚实区）
-
-- `screenshot` 要新版 Termux:API，旧版没有这个命令会明确报错（不装死）。
-- `location` 的 gps 室内慢是物理规律，默认走 network。
-- 部分国产 ROM 的短信/后台授权很作妖，报错信息里写了去哪开。
-
-## Contributing
-
-欢迎 PR / Issue，中英文都行。改工具先跑 `pytest`；加新工具请同时加 mock 数据 + 一个用例。
+版本历史：[CHANGELOG.md](CHANGELOG.md)。
 
 ## Star History
 
