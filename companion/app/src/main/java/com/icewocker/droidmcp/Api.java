@@ -57,7 +57,7 @@ import org.json.JSONObject;
  */
 public final class Api {
 
-    private static final String VERSION = "0.2.0";
+    private static final String VERSION = "0.3.1";
     private static final String NAME = "droid-mcp-companion";
     private static final String NOTIFY_CHANNEL = "droid-mcp";
 
